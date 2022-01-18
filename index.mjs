@@ -21,6 +21,7 @@ const stdlib = loadStdlib(process.env);
     const OUTCOME = ['Bob Wins', 'Draw', 'Alice Wins'];
 
     const Player = (Who) => ({
+        ...stdlib.hasRandom, // from reach standard library, we'll use to generate random numbers and protect Alice's hand (for the backend to use)
         getHand: () => {
             const hand = Math.floor(Math.random() * 3);
             console.log(`${Who} played ${HAND[hand]}`);

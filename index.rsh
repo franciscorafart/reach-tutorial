@@ -21,12 +21,14 @@ const Player = {
     ...hasRandom, // Adds has random to the interface that the Reach program expects from the front end
     getHand: Fun([], UInt),
     setOutcome:Fun([UInt], Null),
+    informTimeout:Fun([], Null),
 };
 
 export const main = Reach.App(() => {
     const Alice = Participant('Alice', {
         ...Player, // 'intract' will be bound to the methods defined in this object
         wager: UInt,
+        deadline: UInt, // time delta (blocks / rounds)
     });
 
     const Bob = Participant('Bob', {
@@ -35,6 +37,12 @@ export const main = Reach.App(() => {
     });
     init();
 
+    const informTimeout = () => {
+        each([Alice, Bob], () => {
+            interact.informTimeout();
+        });
+    };
+
     Alice.only(() => { // Only Alice performs
         const wager = declassify(interact.wager);
         const _handAlice = interact.getHand(); // compute hand but not declassify it (So Bob can't see it)
@@ -42,9 +50,10 @@ export const main = Reach.App(() => {
         // *** Important: makeCommitment allows to publish data, but also keep it secret
         const [_commitAlice, _saltAlice] = makeCommitment(interact, _handAlice)
         const commitAlice = declassify(_commitAlice);
+        const deadline = declassify(interact.deadline);
     });
 
-    Alice.publish(wager, commitAlice).pay(wager); // Alice joins the application, the consensus network
+    Alice.publish(wager, commitAlice, deadline).pay(wager); // Alice joins the application, the consensus network
     commit();
 
     unknowable(Bob, Alice(_handAlice, _saltAlice)); // Makes sure _handAlice and _saltAlice are not visible to Bob at this point in the code
@@ -54,7 +63,11 @@ export const main = Reach.App(() => {
         const handBob = declassify(interact.getHand());
     })
 
-    Bob.publish(handBob).pay(wager);
+    Bob.publish(handBob)
+        .pay(wager)
+        // Timeour handler. If bob times out  after 'deadline', then applications transitions to arrow function
+        // closeTo transfers all funds in the contract to the participant passed into the params
+        .timeout(relativeTime(deadline), () => closeTo(Alice, informTimeout));
     commit();
 
     Alice.only(() => {
@@ -62,7 +75,9 @@ export const main = Reach.App(() => {
         const handAlice = declassify(_handAlice);
     });
 
-    Alice.publish(saltAlice, handAlice);
+    Alice.publish(saltAlice, handAlice)
+        .timeout(relativeTime(deadline), () => closeTo(Bob, informTimeout));
+
     checkCommitment(commitAlice, saltAlice, handAlice);
 
     // Calculate the outcome before commiting

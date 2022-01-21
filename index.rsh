@@ -25,7 +25,7 @@ forall(UInt, hand => assert(winner(hand, hand) == DRAW));
 const Player = {
     ...hasRandom, // Add hasRandom to the interface that the Reach program expects from the front end
     getHand: Fun([], UInt),
-    setOutcome:Fun([UInt], Null),
+    seeOutcome:Fun([UInt], Null),
     informTimeout:Fun([], Null),
 };
 
@@ -113,6 +113,6 @@ export const main = Reach.App(() => {
     commit();
 
     each([Alice, Bob], () => {
-        interact.setOutcome(outcome);
+        interact.seeOutcome(outcome);
     });
 });

@@ -25,13 +25,13 @@ const stdlib = loadStdlib(process.env);
     } else {
         const secret = await ask(
             'What is your current secret?',
-            (x => x),
+            (x => x)
         );
         acc = await stdlib.newAccountFromSecret(secret);
     }
 
     let ctc = null
-    if (Alice) {
+    if (isAlice) {
         ctc = acc.contract(backend);
         ctc.getInfo().then(info => {
             console.log(`The contract is deployed as ${JSON.stringify(info)}`);

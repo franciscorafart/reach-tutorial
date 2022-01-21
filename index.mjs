@@ -1,66 +1,117 @@
 import { loadStdlib } from '@reach-sh/stdlib';
 import * as backend from './build/index.main.mjs'; // backend that reach compile will produce
+import {ask, yesno, done } from '@reach-sh/stdlib/ask.mjs';
 const stdlib = loadStdlib(process.env);
 
-/// NOTE: Continue at setting Alice's wager
 (async () => {
-    const startingBalance = stdlib.parseCurrency(100);
-    // These endowments only work on the Reach testing network
-    const accAlice = await stdlib.newTestAccount(startingBalance);
-    const accBob = await stdlib.newTestAccount(startingBalance);
+    const isAlice = await ask(
+        'Are you Alice', 
+        yesno,
+    );
+
+    const who = isAlice ? 'Alice' :  'Bob';
+
+    console.log(`Starting Rock, Paper, Scissors as ${who}`);
+
+    let acc = null;
+    const createAcc = await ask(
+        'Would you like to create an account (only possible on devnet)',
+        yesno,
+    );
+
+    if (createAcc) {
+        // These endowments only work on the Reach testing network
+        acc = await stdlib.newTestAccount(stdlib.parseCurrency(1000));
+    } else {
+        const secret = await ask(
+            'What is your current secret?',
+            (x => x),
+        );
+        acc = await stdlib.newAccountFromSecret(secret);
+    }
+
+    let ctc = null
+    if (Alice) {
+        ctc = acc.contract(backend);
+        ctc.getInfo().then(info => {
+            console.log(`The contract is deployed as ${JSON.stringify(info)}`);
+        });
+    } else {
+        const info = await ask(
+            'Please paste the contract information',
+            JSON.parse,
+        );
+        ctc = acc.contract(backend, info);
+    }
 
     const fmt = (x) => stdlib.formatCurrency(x, 4);
-    const getBalance = async (who) => fmt(await stdlib.balanceOf(who));
-    const beforeAlice = await getBalance(accAlice);
-    const beforeBob = await getBalance(accBob);
+    const getBalance = async () => fmt(await stdlib.balanceOf(acc));
+    
+    const before = await getBalance();
+    console.log(`Your balance  is ${before}`);
 
-    const ctcAlice = accAlice.contract(backend); // deploy application for Alice
-    const ctcBob = accBob.contract(backend, ctcAlice.getInfo()); // Attach Bob to application
+    const interact = {...stdlib.hasRandom};
+
+    // const ctcAlice = accAlice.contract(backend); // deploy application for Alice
+    // const ctcBob = accBob.contract(backend, ctcAlice.getInfo()); // Attach Bob to application
+
+    interact.informTimeout = () => {
+        console.log('There was a timout');
+        process.exit(1);
+    }
+
+    // Define wager amount or acceptWager depending on which use
+    if (isAlice) {
+        const amt = await ask(
+            'How much do you want to wager?',
+            stdlib.parseCurrency,
+        );
+
+        interact.wager= amt;
+        interact.deadline = { ETH: 100, ALGO: 100, CFX: 1000}[stdlib.connector]
+    } else { 
+        // BOB
+        interact.acceptWager= async (amt) => {
+            const accepted = await ask(
+                `Do you accept the wager of ${fmt(amt)}`,
+                yesno
+            );
+
+            if (!accepted) {
+                process.exit(0);
+            }
+        }
+    }
 
     const HAND = ['Rock', 'Paper', 'Scissors'];
-    const OUTCOME = ['Bob Wins', 'Draw', 'Alice Wins'];
+    const HANDS = {
+        'Rock': 0, 'R': 0, 'r': 0,
+        'Paper': 1, 'P': 1, 'p': 1,
+        'Scissors': 2, 'S': 2, 's': 2,
+    };
 
-    const Player = (Who) => ({
-        ...stdlib.hasRandom, // from reach standard library, we'll use to generate random numbers and protect Alice's hand (for the backend to use)
-        getHand: async () => {
-            const hand = Math.floor(Math.random() * 3);
-            console.log(`${Who} played ${HAND[hand]}`);
-            if ( Math.random() <= 0.01 ) {
-                for ( let i = 0; i < 10; i++ ) {
-                    console.log(`  ${Who} takes their sweet time sending it back...`);
-                    await stdlib.wait(1);
-                }
-              }
-            return hand;
-        },
-        setOutcome: (outcome) => {
-            console.log(`${Who} saw outcome ${OUTCOME[outcome]}`);
-        },
-        informTimeout: () => {
-            console.log(`${Who} observerd a timeout`)
-        }
-    });
-
-
-    // intialize backends
-    // These are the objects that will bound to the 'interact' in the Reach program
-    await Promise.all([
-        ctcAlice.p.Alice({
-            ...Player('Alice'),
-            wager: stdlib.parseCurrency(5),
-            deadline: 10,
-        }),
-        ctcBob.p.Bob({
-            ...Player('Bob'),
-            acceptWager: async (amt) => {
-                console.log(`Bob accepts the wager of ${fmt(amt)}`);
+    interact.getHand = async () => {
+        const hand = await ask(`What hand will you play?`, x => {
+            const hand = HANDS[x];
+            if (hand == null) {
+                throw Error(`Not a valid hand ${hand}`) 
             }
-        }),
-    ]);
+            return hand;
+        });
+        console.log(`You played hand ${HAND[hand]}`);
+        return hand;
+    }
+    
+    const OUTCOME = ['Bob Wins', 'Draw', 'Alice Wins'];
+    interact.seeOutcome = async outcome => {
+        console.log(`The outcome is ${OUTCOME[outcome]}`);
+    };
 
-    const afterAlice = await getBalance(accAlice);
-    const afterBob = await getBalance(accBob);
+    const part = isAlice ? ctc.p.Alice: ctc.p.Bob;
+    await part(interact);
 
-    console.log(`Alice went from ${beforeAlice} to ${afterAlice}.`);
-    console.log(`Bob went from ${beforeBob} to ${afterBob}`);
+    const after = await getBalance();
+    console.log(`Your balance is now ${after}`);
+
+    done();
 })();

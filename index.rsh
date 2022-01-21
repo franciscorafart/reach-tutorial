@@ -3,7 +3,10 @@
 const [isHand, ROCK, PAPER, SCISSORS ] = makeEnum(3);
 const [isOutcome, B_WINS, DRAW, A_WINS] = makeEnum(3);
 
-const winner = (handAlice, handBob) => ((handAlice + (4 - handBob)) % 3);
+const winner = (
+    handAlice, 
+    handBob
+) => ((handAlice + (4 - handBob)) % 3);
 
 assert(winner(ROCK, PAPER) == B_WINS);
 assert(winner(PAPER, ROCK) == A_WINS);
@@ -12,6 +15,7 @@ assert(winner(ROCK, ROCK) == DRAW);
 
 // Proof of theorem using symbolic execution engine 
 // i.e Not trying out every possible value for input params
+// Make sure eveery possible value is valid
 forall(UInt, handAlice => 
     forall(UInt, handBob =>
         assert(isOutcome(winner(handAlice, handBob)))));
@@ -44,7 +48,8 @@ export const main = Reach.App(() => {
         });
     };
 
-    Alice.only(() => { // Only Alice performs
+    // Only Alice performs
+    Alice.only(() => {
         const wager = declassify(interact.wager);
         const deadline = declassify(interact.deadline);
     });
@@ -56,7 +61,7 @@ export const main = Reach.App(() => {
         interact.acceptWager(wager);
     })
     
-    // Timeour handler. If bob times out  after 'deadline', then applications transitions to arrow function
+    // Timeout handler. If bob times out after 'deadline', then applications transitions to arrow function
     // closeTo transfers all funds in the contract to the participant passed into the params
     Bob.pay(wager)
         .timeout(relativeTime(deadline), () => closeTo(Alice, informTimeout));

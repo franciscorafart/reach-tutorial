@@ -4,6 +4,9 @@ import {ask, yesno, done } from '@reach-sh/stdlib/ask.mjs';
 const stdlib = loadStdlib(process.env);
 
 (async () => {
+    // NOTE: To deply on algo testnet set REACH_CONNECTOR_MODE=ALGO-live on the terminal for both participants
+    stdlib.setProviderByName('TestNet');
+
     const isAlice = await ask(
         'Are you Alice', 
         yesno,
@@ -13,22 +16,13 @@ const stdlib = loadStdlib(process.env);
 
     console.log(`Starting Rock, Paper, Scissors as ${who}`);
 
-    let acc = null;
-    const createAcc = await ask(
-        'Would you like to create an account (only possible on devnet)',
-        yesno,
-    );
 
-    if (createAcc) {
-        // These endowments only work on the Reach testing network
-        acc = await stdlib.newTestAccount(stdlib.parseCurrency(1000));
-    } else {
-        const secret = await ask(
-            'What is your current secret?',
-            (x => x)
-        );
-        acc = await stdlib.newAccountFromSecret(secret);
-    }
+    const secret = await ask(
+        'What is your current mnemonic?',
+        (x => x)
+    );
+    const acc = await stdlib.newAccountFromMnemonic(secret);
+    
 
     let ctc = null
     if (isAlice) {

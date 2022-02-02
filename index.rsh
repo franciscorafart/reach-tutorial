@@ -40,7 +40,7 @@ export const main = Reach.App(() => {
         ...Player,
         acceptWager: Fun([UInt], Null),
     });
-    init();
+    init(); // intializa participants, views, and compilation options
 
     const informTimeout = () => {
         each([Alice, Bob], () => {
@@ -48,14 +48,14 @@ export const main = Reach.App(() => {
         });
     };
 
-    // Only Alice performs
+    // Only Alice performs => This is a local step
     Alice.only(() => {
         const wager = declassify(interact.wager);
         const deadline = declassify(interact.deadline);
     });
     
     Alice.publish(wager, deadline).pay(wager); // Alice joins the application, the consensus network
-    commit();
+    commit(); // commit finishes a consensus step and allows for continuation of local steps
     
     Bob.only(() => {
         interact.acceptWager(wager);
@@ -69,7 +69,7 @@ export const main = Reach.App(() => {
     var outcome = DRAW;
     // States invariant portion of the while loop => balance is constant and `outcome` is a valid outcome
     invariant( balance() == 2 * wager && isOutcome(outcome) );
-    while (outcome == DRAW) {
+    while (outcome == DRAW) { // while is a Consensus Step
         commit();
         
         Alice.only(() => {
